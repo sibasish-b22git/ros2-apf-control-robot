@@ -1,77 +1,60 @@
-# ROS 2 Custom PID Pendulum Controller
+# ROS 2 Artificial Potential Field (APF) Robot Navigator
 
-This repository contains a ROS 2 (Jazzy) and Gazebo Harmonic simulation of a 1-DOF inverted pendulum, controlled by a custom-written Python PID controller. 
+A reactive, LiDAR-based Artificial Potential Field (APF) navigation controller for differential drive robots in ROS 2 and Gazebo. 
 
-Instead of relying entirely on standard `ros2_controllers`, this project demonstrates how to bridge custom control theory math with the `ros2_control` framework. The Python node reads live physical sensor data from Gazebo, calculates the Proportional-Integral-Derivative (PID) corrections at 100Hz, and sends smooth trajectory commands to the simulated hardware.
+This package allows a robot to autonomously navigate to dynamic `[x, y]` coordinates while smoothly steering around obstacles in real-time. It processes standard LaserScan data to generate repulsive force vectors and Odometry data to generate attractive force vectors, combining them into a normalized kinematic velocity command.
 
-## 🛠️ Tech Stack & Requirements
-* **OS:** Ubuntu 24.04
-* **ROS 2:** Jazzy Jalisco
-* **Simulator:** Gazebo Harmonic
-* **Dependencies:** ```bash
-  sudo apt install ros-jazzy-ros2-control ros-jazzy-ros2-controllers ros-jazzy-ros-gz-sim ros-jazzy-xacro
-  ```
+## 🛠️ Prerequisites
 
-## 📦 Package Architecture
+* **OS:** Ubuntu 24.04 (Recommended)
+* **ROS 2:** Jazzy Jalisco (or Humble Hawksbill)
+* **Simulation:** Gazebo Sim (Harmonic/Fortress)
+* **Python Packages:** `numpy`, `matplotlib`, `tf_transformations` and related
 
-This project is divided into two primary packages:
-
-1. **`pendulum_control_description` (C++ / CMake)**
-   * Contains the physical blueprints (`.xacro` / `.urdf`).
-   * Configures the `gz_ros2_control` hardware abstraction plugins.
-   * Houses the primary launch file that sequences Gazebo, the `robot_state_publisher`, and the `joint_state_broadcaster` using Event Handlers to prevent race conditions.
-
-2. **`pid_controller` (Python)**
-   * Contains the custom `PID_controller` Python node.
-   * Dynamically subscribes to `/joint_states` and targets `/joint_setpoint`.
-   * Calculates real-time positional error using actual sensor feedback.
-   * Configurable via ROS parameters (`kp`, `ki`, `kd`, `joint_name`).
-
-## 🚀 Installation & Build
-
-Clone this repository into your ROS 2 workspace `src` folder:
-
-```bash
-cd ~/your_ros2_ws/src
-git clone <your-repository-url>
-```
-
-Build the packages and source the installation:
-
-```bash
-cd ~/your_ros2_ws
-colcon build --packages-select pendulum_control_description pid_controller
-source install/setup.bash
-```
-
-## 🎮 Usage Instructions
-
-### 1. Launch the Simulation Environment
-This command boots up Gazebo Harmonic, compiles the Xacro blueprint, and spawns the pendulum with its virtual encoders active.
-```bash
-ros2 launch pendulum_control_description pendulum_controller.launch.py
-```
-
-### 2. Launch the Custom PID Controller
-In a new terminal (remember to `source install/setup.bash`), boot up the Python brain. It will automatically load the YAML configuration and wait for a command.
-```bash
-ros2 launch pid_controller pid_controller.launch.py
-```
-*(Note: Ensure the `joint_name` parameter in your `pid.yaml` exactly matches `revolute_joint` from the URDF).*
-
-### 3. Send a Target Setpoint
-In a third terminal, publish a target angle (in radians) to the controller. Use the `-1` flag to send it just once.
-```bash
-ros2 topic pub -1 /joint_setpoint std_msgs/msg/Float64 "{data: 1.5}"
-```
-You should see the pendulum swing to the target position, and the PID controller terminal will log the `Target`, `Error`, and `Command` outputs at 100Hz.
-
-## 📈 Visualizing the Controller (Optional)
-To watch the PID controller's step response and damping in real-time, you can graph the joint states:
-```bash
-ros2 run rqt_plot rqt_plot
-```
-In the GUI, add `/joint_states/position[0]` and `/joint_states/velocity[0]` to watch the physical response curve as you send different setpoints.
+## 1. What This Project Does
+This project implements an **Artificial Potential Field (APF)** algorithm for a differential drive robot in ROS 2. Instead of pre-planning a path, the robot reacts to its environment live at 100Hz.
+It treats the world as a landscape of magnetic forces:
+* **The Goal (Attractive Force):** The algorithm generates an attractive vector directed toward the target [x, y] coordinates. The magnitude of this force is directly proportional to the Euclidean distance between the robot and the goal, providing the primary navigational drive.
+* **The Obstacles (Repulsive Force):** To ensure collision avoidance, a repulsive potential function is generated based on real-time LiDAR point clouds. For any obstacle localized within a defined threshold (repulsion_radius), the system computes a repulsive force inversely proportional to the squared distance, creating a localized high-potential barrier around the obstacle.
+* **The Resultant Force:** The resultant navigational vector is derived from the superposition of the attractive and repulsive gradients. The controller maps this net vector to the robot's differential drive kinematics, continuously resolving the optimal linear and angular velocities required for safe, collision-free convergence.
 
 ---
-**Author:** Sibasish Barik
+
+## 2. How to Run It
+
+**Step 1: Clone the Repository into your system**
+   Clone this repository into the `src` folder of your ROS 2 workspace:
+   ```bash
+   cd ~/your_ros2_workspace
+   git clone https://github.com/sibasish-b22git/ros2-apf-control-robot/tree/main
+```
+
+**Step 2: Launch the Robot and Simulation**
+This boots up Gazebo, spawns the robot based on its URDF, and starts broadcasting the TF tree and sensor data.
+```bash
+ros2 launch diff_drive_control apf.launch.py
+```
+
+**Step 3: Run the APF Brain**
+Open a new terminal and start the controller. It will immediately begin listening to Odometry and LiDAR.
+```bash
+ros2 run diff_drive_control apf_controller
+```
+
+**Step 4: Issue a Dynamic Goal**
+Open a third terminal. Use the ROS 2 parameter system to magically drop a new goal into the world without restarting the node:
+```bash
+ros2 param set /apf_controller goal "[-5.0, 0.0]"
+```
+
+---
+
+## 3. How to Visualize the Robot in Gazebo
+
+To see exactly how close your robot is to hitting walls, a 3D perspective can trick your eyes. You need a perfect bird's-eye view.
+
+1.  In Gazebo, look at the top toolbar for the **View Angle** (the 3D cube icon). Click the **Top** face to look 90 degrees straight down.
+2.  Next to it, click the camera icon and change the projection from **Perspective** to **Orthographic**.
+3.  This flattens the world into a 2D map, completely removing depth distortion.
+
+---
