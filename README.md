@@ -32,13 +32,13 @@ It treats the world as a landscape of magnetic forces:
 **Step 2: Launch the Robot and Simulation**
 This boots up Gazebo, spawns the robot based on its URDF, and starts broadcasting the TF tree and sensor data.
 ```bash
-ros2 launch diff_drive_control apf.launch.py
+ros2 launch diff_drive_description diff_drive_gazebo.launch.py robot_type:=with_control
 ```
 
 **Step 3: Run the APF Brain**
 Open a new terminal and start the controller. It will immediately begin listening to Odometry and LiDAR.
 ```bash
-ros2 run diff_drive_control apf_controller
+ros2 launch diff_drive_control apf.launch.py
 ```
 
 **Step 4: Issue a Dynamic Goal**
