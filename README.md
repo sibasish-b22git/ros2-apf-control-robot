@@ -41,10 +41,19 @@ Open a new terminal and start the controller. It will immediately begin listenin
 ros2 launch diff_drive_control apf.launch.py
 ```
 
-**Step 4: Issue a Dynamic Goal**
-Open a third terminal. Use the ROS 2 parameter system to magically drop a new goal into the world without restarting the node:
+**Step 4: Dynamic Goal & Parameter Tuning**
+
+The APF controller supports **runtime parameter tuning** through the ROS 2 parameter system, allowing goals and controller parameters to be changed without restarting the node. For example:
+
 ```bash
+# Set navigation goal
 ros2 param set /apf_controller goal "[-5.0, 0.0]"
+
+# Tune APF parameters
+ros2 param set /apf_controller kp 0.2
+ros2 param set /apf_controller eta 0.3
+ros2 param set /apf_controller repulsion_radius 0.8
+ros2 param set /apf_controller max_linear_vel 0.1
 ```
 
 ---
